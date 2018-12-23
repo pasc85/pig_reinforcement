@@ -1,1 +1,3 @@
-pig_dev.ipnb
+pig_dev.ipynb
+.ipynb_checkpoints
+player_data/*
