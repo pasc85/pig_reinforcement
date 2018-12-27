@@ -60,7 +60,7 @@ class PigPlayer:
         # intialise score counter for the turn and list of decisions
         turn_total = int(0)
         dec = []
-        # look until player rolls 1, decides to hold, or reaches 100
+        # loop until player rolls 1, decides to hold, or reaches 100
         while True:
             # roll die
             roll = random.randint(1, 6)
@@ -119,7 +119,7 @@ class PigPlayer:
                 mat_file = open(fname, 'rb')
                 mat = mat + pickle.load(mat_file)
                 mat_file.close()
-        self.dec_matrix = (mat + source_counter
+        self.dec_matrix = (mat - source_counter
                            * np.ones((100, 100, 100, 2, 2), dtype=int))
 
     def record_decisions(self, decisions=[], has_won=True):
@@ -129,11 +129,11 @@ class PigPlayer:
                 mat_file = open(fname, 'rb')
                 mat = pickle.load(mat_file)
                 mat_file.close()
-                for d in decisions:
-                    temp = mat[d[0], d[1], d[2], d[3], int(has_won)]
-                    mat[d[0], d[1], d[2], d[3], int(has_won)] = temp + 1
             else:
                 mat = np.ones((100, 100, 100, 2, 2), dtype=int)
+            for d in decisions:
+                temp = mat[d[0], d[1], d[2], d[3], int(has_won)]
+                mat[d[0], d[1], d[2], d[3], int(has_won)] = temp + 1
             mat_file = open(fname, 'wb')
             pickle.dump(mat, mat_file)
             mat_file.close()
@@ -167,18 +167,18 @@ class PigTournament:
         if output:
             print(str(p1_score) + ' : ' + str(p2_score))
         if random.random() <= 0.5:
-            temp = self.p2.play_turn(p2_score, p1_score)
+            temp = self.p2.play_turn(p2_score, p1_score, output)
             p2_score = temp[0]
             p2_decisions = p2_decisions + temp[1]
             if output:
                 print(str(p1_score) + ' : ' + str(p2_score))
         while max(p1_score, p2_score) < 100:
-            temp = self.p1.play_turn(p1_score, p2_score)
+            temp = self.p1.play_turn(p1_score, p2_score, output)
             p1_score = temp[0]
-            p1_decisions = p2_decisions + temp[1]
+            p1_decisions = p1_decisions + temp[1]
             if output:
                 print(str(p1_score) + ' : ' + str(p2_score))
-            temp = self.p2.play_turn(p2_score, p1_score)
+            temp = self.p2.play_turn(p2_score, p1_score, output)
             p2_score = temp[0]
             p2_decisions = p2_decisions + temp[1]
             if output:
