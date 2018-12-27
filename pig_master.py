@@ -18,7 +18,7 @@ class PigPlayer:
         if strategy not in ['random', 'hold', 'learn']:
             print("<strategy> has to be 'random', 'hold', or 'learn'.")
             raise TypeError
-        if not isinstance(hold_at, int) or hold_at < 1 or hold_at > 100:
+        if not isinstance(hold_at, int) or hold_at < 1 or hold_at >= 100:
             print("<hold_at> has to be an integer between 1 and 100.")
             raise TypeError
         if not isinstance(hold_p, (float, int)) or hold_p < 0 or hold_p > 1:
@@ -57,7 +57,7 @@ class PigPlayer:
         return ret_str
 
     def play_turn(self, own_score, opp_score, output=False):
-        # intialise score counter for the turn and list of decisions
+        # intialise score counter and list of decisions for the turn
         turn_total = int(0)
         dec = []
         # loop until player rolls 1, decides to hold, or reaches 100
@@ -96,12 +96,7 @@ class PigPlayer:
             m = self.dec_matrix[own_score, opp_score, turn_total]
             win_prob_when_hold = m[1, 1]/(m[1, 0] + m[1, 1])
             win_prob_when_cont = m[0, 1]/(m[0, 0] + m[0, 1])
-            s = win_prob_when_hold + win_prob_when_cont
-            win_prob_when_hold = win_prob_when_hold/s
-            if random.random() < win_prob_when_hold:
-                return True
-            else:
-                return False
+            return (win_prob_when_hold > win_prob_when_cont)
         # holder always holds once threshold hold_at is reached
         if strategy == 'hold':
             return (turn_total >= self.hold_at)
@@ -110,28 +105,36 @@ class PigPlayer:
             return (random.random() <= self.hold_p)
 
     def reload_decision_matrix(self):
-        source_counter = int(0)
-        mat = np.ones((100, 100, 100, 2, 2), dtype=int)
-        for s in self.learn_from:
-            fname = './player_data/' + s + '.p'
-            if os.path.isfile(fname):
-                source_counter = source_counter + 1
-                mat_file = open(fname, 'rb')
-                mat = mat + pickle.load(mat_file)
-                mat_file.close()
-        self.dec_matrix = (mat - source_counter
-                           * np.ones((100, 100, 100, 2, 2), dtype=int))
+        if self.strategy == 'learn':
+            # if player is a learner, generate matrix of ones and add the
+            # frequencies from the sources given by the 'learn_from' list
+            source_counter = int(0)
+            mat = np.ones((100, 100, 100, 2, 2), dtype=int)
+            for s in self.learn_from:
+                fname = './player_data/' + s + '.p'
+                if os.path.isfile(fname):
+                    source_counter = source_counter + 1
+                    mat_file = open(fname, 'rb')
+                    mat = mat + pickle.load(mat_file)
+                    mat_file.close()
+            self.dec_matrix = (mat - source_counter
+                               * np.ones((100, 100, 100, 2, 2), dtype=int))
 
     def record_decisions(self, decisions=[], has_won=True):
         if not self.write_to == '':
             fname = './player_data/' + self.write_to + '.p'
             if os.path.isfile(fname):
+                # if file exists, open it
                 mat_file = open(fname, 'rb')
                 mat = pickle.load(mat_file)
                 mat_file.close()
             else:
+                # otherwise, generate matrix of ones
+                # (which gives a 50-50 to start with)
                 mat = np.ones((100, 100, 100, 2, 2), dtype=int)
             for d in decisions:
+                # then increase entries corresponding to the decisions
+                # that were made
                 temp = mat[d[0], d[1], d[2], d[3], int(has_won)]
                 mat[d[0], d[1], d[2], d[3], int(has_won)] = temp + 1
             mat_file = open(fname, 'wb')
@@ -142,6 +145,7 @@ class PigPlayer:
 class PigTournament:
 
     def __init__(self, player1, player2):
+
         if not isinstance(player1, PigPlayer):
             print("<player1> has to be a PigPlayer.")
         if not isinstance(player2, PigPlayer):
@@ -157,7 +161,8 @@ class PigTournament:
                    + str(num_games - p1_wins) + ' wins) ' + self.p2.name)
         return ret_str
 
-    def play_game(self, output=False, append_outcome=True):
+    def play_game(self, output=False):
+        # initialise player scores, list of decisions; reload decision matrix
         p1_score = int(0)
         p2_score = int(0)
         p1_decisions = []
@@ -166,7 +171,10 @@ class PigTournament:
         self.p2.reload_decision_matrix()
         if output:
             print(str(p1_score) + ' : ' + str(p2_score))
+        # flip coin to see whether player 2 starts
         if random.random() <= 0.5:
+            # let player 2 play a turn, returns new score and
+            # list of decisions
             temp = self.p2.play_turn(p2_score, p1_score, output)
             p2_score = temp[0]
             p2_decisions = p2_decisions + temp[1]
@@ -183,27 +191,27 @@ class PigTournament:
             p2_decisions = p2_decisions + temp[1]
             if output:
                 print(str(p1_score) + ' : ' + str(p2_score))
-        outcome = (p1_score >= 100)
-        if append_outcome:
-            self.results = self.results + [outcome]
-        if outcome:
+        p1_won = (p1_score >= 100)
+        self.results = self.results + [p1_won]
+        if p1_won:
+            # record p1's decisions as winning decisions ...
             self.p1.record_decisions(p1_decisions, True)
+            # ... and p2's decisions as losing decisions
             self.p2.record_decisions(p2_decisions, False)
         else:
             self.p1.record_decisions(p1_decisions, False)
             self.p2.record_decisions(p2_decisions, True)
-        return [outcome]
+        return [p1_won]
 
-    def play_games(self, n=10, append_outcome=True):
-        ret_list = []
+    def play_games(self, n=100):
         for k in range(n):
-            ret_list = ret_list + self.play_game(append_outcome=False)
-        if append_outcome:
-            self.results = self.results + ret_list
-        return ret_list
+            self.play_game()
 
     def results_as_sequence(self, n=1):
         pass
 
     def plot_results(self):
+        pass
+
+    def reset_results(self):
         pass
