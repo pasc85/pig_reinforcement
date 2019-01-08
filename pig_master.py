@@ -2,6 +2,8 @@ import random
 import numpy as np
 import pickle
 import fs
+from tqdm import tqdm_notebook
+import matplotlib.pyplot as plt
 
 
 class PigPlayer:
@@ -141,6 +143,10 @@ class PigPlayer:
             pickle.dump(mat, mat_file)
             mat_file.close()
 
+    def get_approx_experience(self):
+        # a very rough estimate of the number of games learned from
+        return sum(sum(self.dec_matrix[0, 0, 2]))*5
+
 
 class PigTournament:
 
@@ -155,12 +161,17 @@ class PigTournament:
 
     def __str__(self):
         num_games = len(self.results)
-        p1_wins = sum(self.results)
-        ret_str = (self.p1.name + ' (' + str(p1_wins) + ' wins) : ('
-                   + str(num_games - p1_wins) + ' wins) ' + self.p2.name)
+        if num_games < 100:
+            p1_wins = sum(self.results)
+            ret_str = (self.p1.name + ' (' + str(p1_wins) + ' wins) : ('
+                       + str(num_games - p1_wins) + ' wins) ' + self.p2.name)
+        else:
+            p1_wins = sum(self.results[-100:])
+            ret_str = (self.p1.name + ' (' + str(p1_wins) + ' wins) : ('
+                       + str(100 - p1_wins) + ' wins) ' + self.p2.name)
         return ret_str
 
-    def play_game(self, virt_fs=None, output=False):
+    def play_game(self, virt_fs=None, output=True):
         # initialise player scores, list of decisions; reload decision matrix
         p1_score = int(0)
         p2_score = int(0)
@@ -202,25 +213,28 @@ class PigTournament:
             self.p2.record_decisions(virt_fs, p2_decisions, True)
         return [p1_won]
 
-    def play_games(self, n=100):
+    def play_games(self, n=100, output=False):
         # open real and virtual file system
         real_fs = fs.open_fs('./player_data/')
         virt_fs = fs.open_fs('mem://')
         # copy data from the real file system to the virtual one,
         # work in the virtual file system in the following
         fs.copy.copy_fs(real_fs, virt_fs)
-        for k in range(n):
-            self.play_game(virt_fs)
+        for k in tqdm_notebook(range(n)):
+            self.play_game(virt_fs, output)
         # update the real file system and close both files systems
         fs.copy.copy_fs(virt_fs, real_fs)
         real_fs.close()
         virt_fs.close()
 
-    def results_as_sequence(self, n=1):
-        pass
+    def results_as_sequence(self, n=100):
+        m = (len(self.results) // n) * n
+        temp = np.asarray(self.results[:m]).astype(int).reshape((-1, n))
+        return list(np.sum(temp, axis=1))
 
-    def plot_results(self):
-        pass
+    def plot_results(self, n=100):
+        li = self.results_as_sequence(n)
+        plt.plot(li)
 
     def reset_results(self):
         self.results = []
