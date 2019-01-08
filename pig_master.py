@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import pickle
-import os
+import fs
 
 
 class PigPlayer:
@@ -104,28 +104,28 @@ class PigPlayer:
         if strategy == 'random':
             return (random.random() <= self.hold_p)
 
-    def reload_decision_matrix(self):
-        if self.strategy == 'learn':
+    def reload_decision_matrix(self, virt_fs):
+        if self.strategy == 'learn' and virt_fs is not None:
             # if player is a learner, generate matrix of ones and add the
             # frequencies from the sources given by the 'learn_from' list
             source_counter = int(0)
             mat = np.ones((100, 100, 100, 2, 2), dtype=int)
             for s in self.learn_from:
-                fname = './player_data/' + s + '.p'
-                if os.path.isfile(fname):
+                fname = s + '.p'
+                if virt_fs.isfile(fname):
                     source_counter = source_counter + 1
-                    mat_file = open(fname, 'rb')
+                    mat_file = virt_fs.open(fname, 'rb')
                     mat = mat + pickle.load(mat_file)
                     mat_file.close()
             self.dec_matrix = (mat - source_counter
                                * np.ones((100, 100, 100, 2, 2), dtype=int))
 
-    def record_decisions(self, decisions=[], has_won=True):
-        if not self.write_to == '':
-            fname = './player_data/' + self.write_to + '.p'
-            if os.path.isfile(fname):
+    def record_decisions(self, virt_fs, decisions=[], has_won=True):
+        if not self.write_to == '' and virt_fs is not None:
+            fname = self.write_to + '.p'
+            if virt_fs.isfile(fname):
                 # if file exists, open it
-                mat_file = open(fname, 'rb')
+                mat_file = virt_fs.open(fname, 'rb')
                 mat = pickle.load(mat_file)
                 mat_file.close()
             else:
@@ -137,7 +137,7 @@ class PigPlayer:
                 # that were made
                 temp = mat[d[0], d[1], d[2], d[3], int(has_won)]
                 mat[d[0], d[1], d[2], d[3], int(has_won)] = temp + 1
-            mat_file = open(fname, 'wb')
+            mat_file = virt_fs.open(fname, 'wb')
             pickle.dump(mat, mat_file)
             mat_file.close()
 
@@ -145,7 +145,6 @@ class PigPlayer:
 class PigTournament:
 
     def __init__(self, player1, player2):
-
         if not isinstance(player1, PigPlayer):
             print("<player1> has to be a PigPlayer.")
         if not isinstance(player2, PigPlayer):
@@ -161,14 +160,14 @@ class PigTournament:
                    + str(num_games - p1_wins) + ' wins) ' + self.p2.name)
         return ret_str
 
-    def play_game(self, output=False):
+    def play_game(self, virt_fs=None, output=False):
         # initialise player scores, list of decisions; reload decision matrix
         p1_score = int(0)
         p2_score = int(0)
         p1_decisions = []
         p2_decisions = []
-        self.p1.reload_decision_matrix()
-        self.p2.reload_decision_matrix()
+        self.p1.reload_decision_matrix(virt_fs)
+        self.p2.reload_decision_matrix(virt_fs)
         if output:
             print(str(p1_score) + ' : ' + str(p2_score))
         # flip coin to see whether player 2 starts
@@ -195,17 +194,27 @@ class PigTournament:
         self.results = self.results + [p1_won]
         if p1_won:
             # record p1's decisions as winning decisions ...
-            self.p1.record_decisions(p1_decisions, True)
+            self.p1.record_decisions(virt_fs, p1_decisions, True)
             # ... and p2's decisions as losing decisions
-            self.p2.record_decisions(p2_decisions, False)
+            self.p2.record_decisions(virt_fs, p2_decisions, False)
         else:
-            self.p1.record_decisions(p1_decisions, False)
-            self.p2.record_decisions(p2_decisions, True)
+            self.p1.record_decisions(virt_fs, p1_decisions, False)
+            self.p2.record_decisions(virt_fs, p2_decisions, True)
         return [p1_won]
 
     def play_games(self, n=100):
+        # open real and virtual file system
+        real_fs = fs.open_fs('./player_data/')
+        virt_fs = fs.open_fs('mem://')
+        # copy data from the real file system to the virtual one,
+        # work in the virtual file system in the following
+        fs.copy.copy_fs(real_fs, virt_fs)
         for k in range(n):
-            self.play_game()
+            self.play_game(virt_fs)
+        # update the real file system and close both files systems
+        fs.copy.copy_fs(virt_fs, real_fs)
+        real_fs.close()
+        virt_fs.close()
 
     def results_as_sequence(self, n=1):
         pass
@@ -214,4 +223,4 @@ class PigTournament:
         pass
 
     def reset_results(self):
-        pass
+        self.results = []
