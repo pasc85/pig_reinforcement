@@ -98,7 +98,7 @@ class PigPlayer:
             m = self.dec_matrix[own_score, opp_score, turn_total]
             win_prob_when_hold = m[1, 1]/(m[1, 0] + m[1, 1])
             win_prob_when_cont = m[0, 1]/(m[0, 0] + m[0, 1])
-            return (win_prob_when_hold > win_prob_when_cont)
+            return (win_prob_when_hold >= win_prob_when_cont)
         # holder always holds once threshold hold_at is reached
         if strategy == 'hold':
             return (turn_total >= self.hold_at)
@@ -146,6 +146,9 @@ class PigPlayer:
     def get_approx_experience(self):
         # a very rough estimate of the number of games learned from
         return sum(sum(self.dec_matrix[0, 0, 2]))*5
+
+    def visualise_decision_matrix(self):
+        pass
 
 
 class PigTournament:
