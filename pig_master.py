@@ -148,7 +148,29 @@ class PigPlayer:
         return sum(sum(self.dec_matrix[0, 0, 2]))*5
 
     def visualise_decision_matrix(self):
-        pass
+        M = self.dec_matrix
+        x = []
+        y = []
+        z = []
+        for i in range(100):
+            for j in range(100):
+                for k in range(100):
+                    if i+k < 100:
+                        m = M[i, j, k]
+                        win_prob_when_hold = m[1, 1]/(m[1, 0] + m[1, 1])
+                        win_prob_when_cont = m[0, 1]/(m[0, 0] + m[0, 1])
+                        if win_prob_when_cont > win_prob_when_hold:
+                            x.append(i)
+                            y.append(j)
+                            z.append(k)
+        from mpl_toolkits.mplot3d import Axes3D
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(x, y, z, c='r', marker='.', alpha=0.05)
+        ax.set_xlabel('Player score')
+        ax.set_ylabel('Opponent score')
+        ax.set_zlabel('Turn total')
+        plt.show()
 
 
 class PigTournament:
